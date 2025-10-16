@@ -1,0 +1,12 @@
+name = "Cangjie"
+grammar = "cangjie"
+path_suffixes = ["cj"] 
+line_comments = ["//"]
+tab_size = 4
+hard_tabs = false
+
+# 可选：添加第一行模式来识别文件
+# first_line_pattern = "^#!.*\\bcangjie\\b"
+
+# 支持的调试器
+debuggers = ["Cangjie"]

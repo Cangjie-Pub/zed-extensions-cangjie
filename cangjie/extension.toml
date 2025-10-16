@@ -1,0 +1,37 @@
+id = "cangjie"
+name = "Cangjie"
+version = "0.1.0"
+schema_version = 1
+description = "Cangjie language support."
+# 使用本地tree-sitter-cangjie项目
+# repository = "https://github.com/cangjie-lang/tree-sitter-cangjie"
+authors = ["Cangjie Team <team@cangjie-lang.org>"]
+themes = []
+icon_themes = []
+languages = ["Cangjie"]
+capabilities = []
+file_types =["cj"]
+
+[lib]
+kind = "Rust"
+
+ [grammars.cangjie]
+ repository = "https://gitcode.com/Cangjie-SIG/tree-sitter-cangjie"
+ rev = "main"
+
+# 语言服务器配置，与用户在zed中的配置ID保持一致
+[language_servers.cangjie-lsp]
+name = "Cangjie LSP Server"
+languages = ["Cangjie"]
+
+[language_servers.cangjie-lsp.language_ids]
+"Cangjie" = "cangjie"
+
+[context_servers]
+
+[slash_commands]
+
+[indexed_docs_providers]
+
+# [debug_adapters.Cangjie]
+# schema_path = "debug_adapter_schemas/Cangjie.json"

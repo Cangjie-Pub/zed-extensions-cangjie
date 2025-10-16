@@ -1,0 +1,12 @@
+{
+  "name": "Cangjie",
+  "publisher": "Cangjie Team",
+  "version": "0.1.0",
+  "displayName": "Cangjie Language Support",
+  "description": "Cangjie language support for Zed editor",
+  "icon": "icon.png",
+  "categories": ["Programming Languages"],
+  "engines": {
+    "zed": ">=0.100.0"
+  }
+}

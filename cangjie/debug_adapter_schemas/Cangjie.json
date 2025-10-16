@@ -1,0 +1,25 @@
+{
+{"type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "default": "Cangjie"
+    },
+    "program": {
+      "type": "string",
+      "description": "Path to the Cangjie program to debug"
+    },
+    "args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Arguments to pass to the program"
+    },
+    "cwd": {
+      "type": "string",
+      "description": "Working directory"
+    }
+  },
+  "required": ["program"]
+}
