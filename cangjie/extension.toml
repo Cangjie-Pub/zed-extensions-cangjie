@@ -26,7 +26,9 @@ languages = ["Cangjie"]
 
 [language_servers.cangjie-lsp.language_ids]
 "Cangjie" = "cangjie"
-
+[language_servers.cangjie-lsp.config]
+enableSemanticHighlighting = true
+trace = { server = "verbose" }
 [context_servers]
 
 [slash_commands]
