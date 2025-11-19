@@ -1,13 +1,10 @@
 // --- 文件顶部 ---
+use std::collections::HashMap;
 use zed::LanguageServerId;
-use zed_extension_api::{self as zed, settings::LspSettings, Result};
+use zed_extension_api::{self as zed, settings::LspSettings, Result}; // 重新引入 HashMap
 
 // --- 配置区 ---
 const LANGUAGE_SERVER_ID: &str = "cangjie-lsp";
-const SDK_DOWNLOAD_URL: &str = "https://github.com/Cangjie-Pub/cangjie_sdk_release/releases/download/1.0.4/cangjie-sdk-mac-aarch64-1.0.4.tar.gz";
-const SDK_DIR_NAME: &str = "cangjie-sdk";
-const SDK_BIN_SUBPATH: &str = "tools/bin/LSPServer";
-const SDK_LIB_SUBPATH: &str = "runtime/lib/darwin_aarch64_llvm";
 
 // --- 结构体定义 ---
 struct CangjieExtension;
@@ -15,40 +12,6 @@ struct CangjieExtension;
 impl CangjieExtension {
     fn new() -> Self {
         Self
-    }
-
-    /// 确保 SDK 存在。如果不存在，则下载并解压到扩展的全局工作目录。
-    fn ensure_sdk_exists(&mut self, language_server_id: &LanguageServerId) -> Result<()> {
-        // 使用相对路径，Zed 会将其解析为扩展的 work 目录下的路径
-        let sdk_target_dir = SDK_DIR_NAME;
-
-        zed::set_language_server_installation_status(
-            language_server_id,
-            &zed::LanguageServerInstallationStatus::Downloading,
-        );
-
-        let download_result = zed::download_file(
-            SDK_DOWNLOAD_URL,
-            &sdk_target_dir,
-            zed::DownloadedFileType::GzipTar,
-        );
-
-        match download_result {
-            Ok(()) => {
-                zed::set_language_server_installation_status(
-                    language_server_id,
-                    &zed::LanguageServerInstallationStatus::None,
-                );
-                Ok(())
-            }
-            Err(e) => {
-                zed::set_language_server_installation_status(
-                    language_server_id,
-                    &zed::LanguageServerInstallationStatus::None,
-                );
-                Err(e)
-            }
-        }
     }
 }
 
@@ -73,23 +36,65 @@ impl zed::Extension for CangjieExtension {
             .into());
         }
 
-        // 确保 SDK 已下载到扩展的全局工作目录
-        self.ensure_sdk_exists(language_server_id)?;
+        // --- 从用户配置中读取路径 ---
+        let config =
+            LspSettings::for_worktree(language_server_id.as_ref(), _worktree).map_err(|err| {
+                format!(
+                    "Failed to read Cangjie LSP settings. Did you configure the paths? Error: {}",
+                    err
+                )
+            })?;
 
-        // 构建相对于扩展 work 目录的命令和环境变量
-        let relative_server_path = format!("./{}/{}/{}", SDK_DIR_NAME, "cangjie", SDK_BIN_SUBPATH);
-        let relative_lib_path = format!("./{}/{}/{}", SDK_DIR_NAME, "cangjie", SDK_LIB_SUBPATH);
+        let settings = config
+            .settings
+            .as_ref()
+            .ok_or("No settings found for Cangjie LSP. Please configure the paths.")?;
 
-        let mut env_vars = std::collections::HashMap::new();
+        // 获取 LSP Server 的可执行文件路径
+        let server_path = settings.get("serverPath")
+            .and_then(|v| v.as_str())
+            .ok_or("Missing 'serverPath' in Cangjie LSP settings. Please specify the path to the LSPServer executable.")?;
+
+        // --- 关键修改：获取 CANGJIE_HOME 路径 ---
+        // 假设用户配置的是 LSPServer 的完整路径，我们需要推导出 SDK 的根目录 (CANGJIE_HOME)
+        // 例如，如果 serverPath 是 `/path/to/cangjie-sdk/cangjie/tools/bin/LSPServer`
+        // 那么 CANGJIE_HOME 应该是 `/path/to/cangjie-sdk/cangjie`
+        // 我们可以通过截断 serverPath 来得到它。
+        use std::path::Path;
+        let server_path_obj = Path::new(server_path);
+        // tools/bin/LSPServer -> tools/bin -> tools -> (parent) -> CANGJIE_HOME
+        let cangjie_home_path_obj = server_path_obj
+            .parent() // bin
+            .and_then(|p| p.parent()) // tools
+            .and_then(|p| p.parent()) // CANGJIE_HOME
+            .ok_or(
+                "Could not determine CANGJIE_HOME from serverPath. Is the serverPath correct?",
+            )?;
+
+        let cangjie_home_str = cangjie_home_path_obj
+            .to_str()
+            .ok_or("CANGJIE_HOME path contains invalid characters.")?
+            .to_string();
+
+        // --- 构建命令和环境变量 ---
+        let mut env_vars = HashMap::new();
+        // 设置 CANGJIE_HOME 环境变量，让 LSPServer 知道 SDK 根目录
+        env_vars.insert("CANGJIE_HOME".to_string(), cangjie_home_str.to_string());
+
+        // 注意：不再设置 DYLD_LIBRARY_PATH，除非后续发现确实还需要
         env_vars.insert(
-            "CANGJIE_HOME".to_string(),
-            format!("./{}/{}", "cangjie", SDK_DIR_NAME),
+            "DYLD_LIBRARY_PATH".to_string(),
+            format!("{}/runtime/lib/darwin_aarch64_llvm", cangjie_home_str),
         );
-        env_vars.insert("DYLD_LIBRARY_PATH".to_string(), relative_lib_path);
 
         Ok(zed::Command {
-            command: relative_server_path,
-            args: vec![],
+            command: server_path.to_string(),
+            args: vec![
+                "src".to_string(),
+                "--disableAutoImport".to_string(),
+                "--enable-log=true".to_string(),
+            ],
+            // args: vec![],
             env: env_vars.into_iter().collect(),
         })
     }
